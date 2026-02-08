@@ -104,6 +104,34 @@ pnpm gateway:watch
 
 Note: `pnpm openclaw ...` runs TypeScript directly (via `tsx`). `pnpm build` produces `dist/` for running via Node / the packaged `openclaw` binary.
 
+## Docker deployment (VPS / production)
+
+Pre-built Docker images are available on GitHub Container Registry (GHCR). Optimized for VPS deployment with minimal disk footprint.
+
+**Quick start:**
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/cctry/openclaw:latest
+
+# Run with docker-compose (recommended)
+curl -o docker-compose.yml https://raw.githubusercontent.com/cctry/openclaw/main/docker-compose.vps.yml
+curl -o .env https://raw.githubusercontent.com/cctry/openclaw/main/.env.vps.example
+# Edit .env with your configuration
+docker-compose pull && docker-compose up -d
+```
+
+**Features**: 
+- Multi-stage build (builder + runtime) for minimal size (~750-900MB vs ~1.5GB)
+- Runtime uses `node:22-slim` base image
+- Removes unnecessary docs, README, assets (~16MB saved)
+- No Bun installation (supply chain risk reduction)
+- Non-root user execution (uid 1000)
+- Compatible with docker-compose 1.17.1+
+- Auto-built on push to `main` and version tags
+
+For detailed instructions: [Docker deployment guide](DOCKER.md) · [VPS deployment guide (中文)](docs/deploy/vps-deployment.md)
+
 ## Security defaults (DM access)
 
 OpenClaw connects to real messaging surfaces. Treat inbound DMs as **untrusted input**.
