@@ -23,7 +23,9 @@ COPY patches ./patches
 COPY scripts ./scripts
 
 # Install all dependencies (including devDependencies for build)
-RUN pnpm install --frozen-lockfile
+# Use BuildKit cache mount for pnpm store to speed up builds
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # Copy source code
 COPY . .
@@ -35,7 +37,8 @@ ENV OPENCLAW_PREFER_PNPM=1
 RUN pnpm ui:build
 
 # Prune development dependencies to keep only production deps
-RUN pnpm install --prod --frozen-lockfile
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    CI=true pnpm install --prod --frozen-lockfile
 
 #############################################
 # Runtime Stage: Minimal production image
