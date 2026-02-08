@@ -10,6 +10,7 @@ permissions: {}
 
 jobs:
   label:
+    if: false  # Workflow disabled
     permissions:
       contents: read
       pull-requests: write
@@ -48,6 +49,7 @@ jobs:
             });
 
   label-issues:
+    if: false  # Workflow disabled
     permissions:
       issues: write
     runs-on: ubuntu-latest
