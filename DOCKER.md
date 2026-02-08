@@ -57,7 +57,7 @@ The Docker image uses a multi-stage build to minimize size:
 
 **Size comparison**:
 - Before: ~1.5GB+ (single-stage, node:22-bookworm)
-- After: ~800MB-1GB (multi-stage, node:22-slim)
+- After: ~750MB-900MB (multi-stage, node:22-slim, no docs/assets)
 
 ### Automatic Builds
 
@@ -122,7 +122,7 @@ Docker 镜像使用多阶段构建以最小化体积:
 
 **体积对比**:
 - 优化前: ~1.5GB+ (单阶段构建, node:22-bookworm)
-- 优化后: ~800MB-1GB (多阶段构建, node:22-slim)
+- 优化后: ~750MB-900MB (多阶段构建, node:22-slim, 移除文档/资源)
 
 ### 自动构建
 
@@ -141,9 +141,15 @@ Docker 镜像使用多阶段构建以最小化体积:
 2. **体积优化**
    - 使用 node:22-slim 作为运行时基础镜像
    - 仅复制生产依赖和构建产物
+   - 移除文档、README、资源文件 (~16MB)
    - 清理 apt 缓存和临时文件
 
-3. **安全性**
+3. **供应链安全**
+   - 移除不必要的 Bun 安装
+   - 避免 curl | bash 供应链风险
+   - 仅使用 pnpm 进行构建
+
+4. **运行安全**
    - 非 root 用户运行 (node:node, uid 1000)
    - 最小化攻击面
 

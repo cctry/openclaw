@@ -121,9 +121,11 @@ curl -o .env https://raw.githubusercontent.com/cctry/openclaw/main/.env.vps.exam
 docker-compose pull && docker-compose up -d
 ```
 
-**Features:**
-- Multi-stage build (builder + runtime) for minimal size (~800MB vs ~1.5GB)
+**Features**: 
+- Multi-stage build (builder + runtime) for minimal size (~750-900MB vs ~1.5GB)
 - Runtime uses `node:22-slim` base image
+- Removes unnecessary docs, README, assets (~16MB saved)
+- No Bun installation (supply chain risk reduction)
 - Non-root user execution (uid 1000)
 - Compatible with docker-compose 1.17.1+
 - Auto-built on push to `main` and version tags

@@ -11,12 +11,14 @@ This document summarizes the complete Docker GHCR implementation for VPS deploym
 - Converted from single-stage to multi-stage build
 - **Builder stage** (node:22-bookworm): Full toolchain for building
 - **Runtime stage** (node:22-slim): Minimal production image
+- Removed Bun installation (supply chain risk reduction, faster builds)
+- Removed unnecessary files: docs/ (~14MB), assets/ (~1.3MB), README files (~2.8MB)
 - Pruned dev dependencies after build
 - Only copies necessary runtime files
 
 **Size optimization**:
 - Before: ~1.5GB+ (single-stage)
-- After: ~800MB-1GB (multi-stage)
+- After: ~750MB-900MB (multi-stage, slim base, no docs/assets)
 
 ### 2. GitHub Actions Workflow (New)
 **Path**: `.github/workflows/docker-ghcr.yml`
@@ -137,26 +139,36 @@ RUN pnpm install --prod --frozen-lockfile
 ```
 
 ### 4. Selective File Copying
-Only copies:
+Only copies essential runtime files:
 - Built artifacts (`dist/`)
 - Production dependencies (`node_modules/`)
 - Runtime files (`openclaw.mjs`, `package.json`)
-- Assets, docs, extensions, skills
-- Essential metadata files
+- Extensions and skills (plugin system)
+- LICENSE
 
-Does NOT copy:
+Does NOT copy (saves ~16MB+):
+- Documentation (`docs/` ~14MB)
+- Assets (`assets/` ~1.3MB) 
+- README files (~104KB)
+- CHANGELOG (~144KB)
+- README-header.png (~1.4MB)
 - Source code (`src/`)
 - Test files
 - Build cache
 - Git history
-- Development dependencies
 
-### 5. Cache Management
+### 5. Supply Chain Security
+- Removed Bun installation (`curl | bash` eliminated)
+- Uses only pnpm for builds
+- Reduces builder stage size and build time
+- Eliminates unnecessary supply chain risk
+
+### 6. Cache Management
 - Cleans apt cache: `rm -rf /var/lib/apt/lists/*`
 - Minimal runtime packages (only ca-certificates)
 - No build tools in runtime image
 
-### 6. Security
+### 7. Runtime Security
 - Non-root user execution (`USER node`)
 - UID 1000 (standard node user)
 - Minimal attack surface

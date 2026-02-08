@@ -3,10 +3,7 @@
 #############################################
 FROM node:22-bookworm AS builder
 
-# Install Bun (required for build scripts)
-RUN curl -fsSL https://bun.sh/install | bash
-ENV PATH="/root/.bun/bin:${PATH}"
-
+# Enable corepack for pnpm support
 RUN corepack enable
 
 WORKDIR /app
@@ -59,18 +56,14 @@ WORKDIR /app
 # Copy production dependencies from builder
 COPY --from=builder /app/node_modules ./node_modules
 
-# Copy built artifacts and necessary runtime files
+# Copy only essential runtime files (no docs, README, changelog, assets)
+# These files save ~16MB+ in the final image
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/openclaw.mjs ./openclaw.mjs
 COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/assets ./assets
-COPY --from=builder /app/docs ./docs
 COPY --from=builder /app/extensions ./extensions
 COPY --from=builder /app/skills ./skills
 COPY --from=builder /app/LICENSE ./LICENSE
-COPY --from=builder /app/README.md ./README.md
-COPY --from=builder /app/README-header.png ./README-header.png
-COPY --from=builder /app/CHANGELOG.md ./CHANGELOG.md
 
 ENV NODE_ENV=production
 
