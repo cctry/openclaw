@@ -77,8 +77,8 @@ docker-setup.sh
 .secrets.baseline
 zizmor.yml
 vitest*.config.ts
-tsconfig*.json
 tsdown.config.ts
+# Note: tsconfig.json and tsconfig.plugin-sdk.dts.json are needed for build
 
 # Git hooks and agent configs
 git-hooks/
