@@ -106,6 +106,108 @@ export const DEFAULT_INPUT_TIMEOUT_MS = 10_000;
 export const DEFAULT_INPUT_PDF_MAX_PAGES = 4;
 export const DEFAULT_INPUT_PDF_MAX_PIXELS = 4_000_000;
 export const DEFAULT_INPUT_PDF_MIN_TEXT_CHARS = 200;
+const DEFAULT_PDF_REMOTE_TIMEOUT_MS = 30_000;
+
+type InputPdfRemoteConfig = {
+  apiUrl?: string;
+  apiToken?: string;
+  timeoutMs: number;
+  disableLocal: boolean;
+};
+
+function parseEnvBoolean(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+
+function resolvePdfRemoteConfig(): InputPdfRemoteConfig {
+  const timeoutRaw = process.env.OPENCLAW_PDF_EXTRACT_API_TIMEOUT_MS;
+  const timeoutMsParsed = timeoutRaw ? Number.parseInt(timeoutRaw, 10) : NaN;
+  return {
+    apiUrl: process.env.OPENCLAW_PDF_EXTRACT_API_URL?.trim() || undefined,
+    apiToken: process.env.OPENCLAW_PDF_EXTRACT_API_TOKEN?.trim() || undefined,
+    timeoutMs:
+      Number.isFinite(timeoutMsParsed) && timeoutMsParsed > 0
+        ? timeoutMsParsed
+        : DEFAULT_PDF_REMOTE_TIMEOUT_MS,
+    disableLocal: parseEnvBoolean(process.env.OPENCLAW_PDF_EXTRACT_DISABLE_LOCAL),
+  };
+}
+
+function normalizeRemotePdfImages(value: unknown): InputImageContent[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return undefined;
+      }
+      const data = "data" in entry ? entry.data : undefined;
+      const mimeType = "mimeType" in entry ? entry.mimeType : undefined;
+      if (typeof data !== "string" || !data.trim()) {
+        return undefined;
+      }
+      if (typeof mimeType !== "string" || !mimeType.trim()) {
+        return undefined;
+      }
+      return { type: "image" as const, data, mimeType };
+    })
+    .filter(Boolean) as InputImageContent[];
+}
+
+async function extractPdfContentRemote(params: {
+  buffer: Buffer;
+  filename?: string;
+  limits: InputFileLimits;
+  config: InputPdfRemoteConfig;
+}): Promise<{ text: string; images: InputImageContent[] }> {
+  const { buffer, filename, limits, config } = params;
+  if (!config.apiUrl) {
+    throw new Error("OPENCLAW_PDF_EXTRACT_API_URL is not configured");
+  }
+
+  const abort = new AbortController();
+  const timeout = setTimeout(() => abort.abort(), config.timeoutMs);
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (config.apiToken) {
+      headers.Authorization = `Bearer ${config.apiToken}`;
+    }
+    const response = await fetch(config.apiUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        filename: filename || "file.pdf",
+        mimeType: "application/pdf",
+        dataBase64: buffer.toString("base64"),
+        limits: {
+          maxPages: limits.pdf.maxPages,
+          maxPixels: limits.pdf.maxPixels,
+          minTextChars: limits.pdf.minTextChars,
+          maxChars: limits.maxChars,
+        },
+      }),
+      signal: abort.signal,
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      const suffix = body ? ` - ${body.slice(0, 200)}` : "";
+      throw new Error(`HTTP ${response.status}${suffix}`);
+    }
+    const payload = (await response.json()) as { text?: unknown; images?: unknown };
+    const text = typeof payload.text === "string" ? payload.text : "";
+    const images = normalizeRemotePdfImages(payload.images);
+    return { text, images };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export function normalizeMimeType(value: string | undefined): string | undefined {
   if (!value) {
@@ -197,8 +299,30 @@ function clampText(text: string, maxChars: number): string {
 async function extractPdfContent(params: {
   buffer: Buffer;
   limits: InputFileLimits;
+  filename?: string;
 }): Promise<{ text: string; images: InputImageContent[] }> {
-  const { buffer, limits } = params;
+  const { buffer, limits, filename } = params;
+  const remoteConfig = resolvePdfRemoteConfig();
+  if (remoteConfig.apiUrl) {
+    try {
+      return await extractPdfContentRemote({
+        buffer,
+        limits,
+        filename,
+        config: remoteConfig,
+      });
+    } catch (err) {
+      if (remoteConfig.disableLocal) {
+        throw new Error(`PDF extraction via remote API failed: ${String(err)}`);
+      }
+      logWarn(`media: remote PDF extraction failed; falling back to local extraction: ${String(err)}`);
+    }
+  } else if (remoteConfig.disableLocal) {
+    throw new Error(
+      "Local PDF extraction is disabled (OPENCLAW_PDF_EXTRACT_DISABLE_LOCAL=1) and no remote API is configured (OPENCLAW_PDF_EXTRACT_API_URL).",
+    );
+  }
+
   const { getDocument } = await loadPdfJsModule();
   const pdf = await getDocument({
     data: new Uint8Array(buffer),
@@ -342,7 +466,7 @@ export async function extractFileContentFromSource(params: {
   }
 
   if (mimeType === "application/pdf") {
-    const extracted = await extractPdfContent({ buffer, limits });
+    const extracted = await extractPdfContent({ buffer, limits, filename });
     const text = extracted.text ? clampText(extracted.text, limits.maxChars) : "";
     return {
       filename,
