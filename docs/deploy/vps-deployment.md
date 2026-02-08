@@ -141,7 +141,19 @@ echo "OPENCLAW_IMAGE=ghcr.io/cctry/openclaw:v2026.2.6-3" >> .env
 echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
 ```
 
-### 2. 磁盘空间不足
+**可用镜像标签**:
+- `latest` - 最新 main 分支构建
+- `sha-abc1234` - 特定 commit SHA
+- `v2026.2.6-3` - 版本标签（当创建 tag 时）
+
+### 2. docker-compose 版本兼容性
+
+本配置兼容 docker-compose 1.17.1+：
+- 使用 version 3.3 语法
+- 移除了 `init: true`（1.17.1 不支持）
+- 使用命名卷 (named volumes)
+
+### 3. 磁盘空间不足
 
 清理旧的 Docker 镜像和容器：
 

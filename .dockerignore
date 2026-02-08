@@ -46,3 +46,52 @@ Swabble/
 Core/
 Users/
 vendor/
+
+# documentation and README files (not needed in runtime)
+docs/
+README.md
+README-header.png
+CHANGELOG.md
+CONTRIBUTING.md
+SECURITY.md
+
+# Docker and CI files
+.github/
+.dockerignore
+Dockerfile
+Dockerfile.sandbox
+Dockerfile.sandbox-browser
+docker-compose*.yml
+docker-setup.sh
+
+# Development files
+.vscode/
+.swiftformat
+.swiftlint.yml
+.shellcheckrc
+.markdownlint-cli2.jsonc
+.oxfmtrc.jsonc
+.oxlintrc.json
+.pre-commit-config.yaml
+.detect-secrets.cfg
+.secrets.baseline
+zizmor.yml
+vitest*.config.ts
+tsconfig*.json
+tsdown.config.ts
+
+# Git hooks and agent configs
+git-hooks/
+.agent
+.agents
+AGENTS.md
+CLAUDE.md
+
+# Build/test scripts (keep minimal scripts/ for build)
+test/
+
+# Deployment configs
+fly.toml
+fly.private.toml
+render.yaml
+appcast.xml

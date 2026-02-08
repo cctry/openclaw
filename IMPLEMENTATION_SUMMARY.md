@@ -27,7 +27,10 @@ This document summarizes the complete Docker GHCR implementation for VPS deploym
 - Triggers on push to `main` and tags (`v*`)
 - Builds only `linux/amd64` platform
 - Pushes to `ghcr.io/cctry/openclaw`
-- Automatic tagging: latest, version, sha-based
+- Simplified tagging strategy:
+  - `latest` - on main branch
+  - `sha-xxxxxxx` - commit SHA
+  - `v*` - version tags
 - Uses GitHub Actions cache for faster builds
 
 ### 3. VPS Docker Compose (New)
@@ -35,6 +38,8 @@ This document summarizes the complete Docker GHCR implementation for VPS deploym
 
 **Features**:
 - Compatible with docker-compose 1.17.1+
+- Version 3.3 syntax
+- Removed `init: true` for compatibility
 - Uses named volumes for persistence
 - Environment variable configuration
 - Two services: gateway and cli
@@ -49,7 +54,19 @@ This document summarizes the complete Docker GHCR implementation for VPS deploym
 - Docker image selection
 - Volume configuration options
 
-### 5. Deployment Documentation (New)
+### 5. .dockerignore (Enhanced)
+**Path**: `.dockerignore`
+
+**Additions**:
+- Documentation files (docs/, README*, CHANGELOG)
+- CI/CD configs (.github/, docker-compose files)
+- Development configs (.vscode/, linter configs)
+- Test files and scripts
+- Git hooks and agent configs
+- Deployment configs (fly.toml, render.yaml)
+- Reduces build context and prevents unnecessary file copying
+
+### 6. Deployment Documentation (New)
 
 **DOCKER.md**: Bilingual quick start guide
 - English and Chinese sections
@@ -119,8 +136,8 @@ The workflow runs on GitHub Actions and:
 ### Image Tags Available
 
 - `ghcr.io/cctry/openclaw:latest` - Latest main branch
-- `ghcr.io/cctry/openclaw:v2026.2.6-3` - Specific version
-- `ghcr.io/cctry/openclaw:main-abc1234` - SHA-based tag
+- `ghcr.io/cctry/openclaw:sha-abc1234` - Specific commit SHA
+- `ghcr.io/cctry/openclaw:v2026.2.6-3` - Version tags (when tagged)
 
 ## Optimization Techniques Applied
 
