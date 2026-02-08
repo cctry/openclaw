@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   docs-scope:
+    if: false  # Temporarily disabled for image optimization work
     runs-on: ubuntu-latest
     outputs:
       docs_only: ${{ steps.check.outputs.docs_only }}

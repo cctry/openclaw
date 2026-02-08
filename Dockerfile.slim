@@ -32,9 +32,6 @@ COPY . .
 
 # Build the application
 RUN OPENCLAW_A2UI_SKIP_MISSING=1 pnpm build
-# Force pnpm for UI build (Bun may fail on ARM/Synology architectures)
-ENV OPENCLAW_PREFER_PNPM=1
-RUN pnpm ui:build
 
 # Remove node_modules and reinstall only production dependencies
 # CRITICAL: --no-optional ensures @napi-rs/canvas is NEVER installed

@@ -13,7 +13,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push:
+  build-and-push-ultra:
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -32,25 +32,149 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels)
+      - name: Extract metadata (tags, labels) for ultra
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=ultra,enable={{is_default_branch}}
+            type=sha,format=short,prefix=sha-,suffix=-ultra
+            type=ref,event=tag,suffix=-ultra
+            type=semver,pattern=v{{version}},suffix=-ultra
+
+      - name: Build and push ultra Docker image (distroless, no UI, no optional)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.ultra
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=docker-build-ultra
+          cache-to: type=gha,mode=max,scope=docker-build-ultra
+          provenance: false
+
+      - name: Inspect ultra image
+        run: |
+          IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          echo "=== Ultra Image Inspection ==="
+          docker pull "$IMAGE_TAG"
+          docker image inspect "$IMAGE_TAG" | jq '.[0] | {Size: .Size, VirtualSize: .VirtualSize, Architecture: .Architecture}'
+          echo ""
+          echo "=== Ultra Image History (sizes) ==="
+          docker history "$IMAGE_TAG" --human --no-trunc | head -20
+
+  build-and-push-slim:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for slim
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=slim,enable={{is_default_branch}}
             type=sha,format=short,prefix=sha-
+            type=sha,format=short,prefix=sha-,suffix=-slim
             type=ref,event=tag,prefix=
+            type=ref,event=tag,suffix=-slim
             type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{version}},suffix=-slim
 
-      - name: Build and push Docker image
+      - name: Build and push slim Docker image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./Dockerfile
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=docker-build
-          cache-to: type=gha,mode=max,scope=docker-build
+          cache-from: type=gha,scope=docker-build-slim
+          cache-to: type=gha,mode=max,scope=docker-build-slim
           provenance: false
+
+      - name: Inspect slim image
+        run: |
+          IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          echo "=== Slim Image Inspection ==="
+          docker pull "$IMAGE_TAG"
+          docker image inspect "$IMAGE_TAG" | jq '.[0] | {Size: .Size, VirtualSize: .VirtualSize, Architecture: .Architecture}'
+          echo ""
+          echo "=== Slim Image History (sizes) ==="
+          docker history "$IMAGE_TAG" --human --no-trunc | head -20
+
+  build-and-push-full:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for full
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=full,enable={{is_default_branch}}
+            type=sha,format=short,prefix=sha-,suffix=-full
+            type=ref,event=tag,suffix=-full
+            type=semver,pattern=v{{version}},suffix=-full
+
+      - name: Build and push full Docker image (with canvas)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.full
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=docker-build-full
+          cache-to: type=gha,mode=max,scope=docker-build-full
+          provenance: false
+
+      - name: Inspect full image
+        run: |
+          IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          echo "=== Full Image Inspection ==="
+          docker pull "$IMAGE_TAG"
+          docker image inspect "$IMAGE_TAG" | jq '.[0] | {Size: .Size, VirtualSize: .VirtualSize, Architecture: .Architecture}'
+          echo ""
+          echo "=== Full Image History (sizes) ==="
+          docker history "$IMAGE_TAG" --human --no-trunc | head -20

@@ -10,6 +10,7 @@ permissions: {}
 
 jobs:
   label:
+    if: false  # Temporarily disabled for image optimization work
     permissions:
       contents: read
       pull-requests: write
