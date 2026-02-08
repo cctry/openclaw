@@ -46,6 +46,10 @@ docker run -d \
    docker-compose up -d
    ```
 
+**Security Note**: Ports are bound to `127.0.0.1` (localhost) by default for security.
+
+**CLI Usage**: Use `docker run --rm -it -e OPENCLAW_GATEWAY_TOKEN=... -v openclaw_openclaw-config:/home/node/.openclaw ghcr.io/cctry/openclaw:latest <command>` for one-off CLI commands.
+
 For detailed instructions, see: [docs/deploy/vps-deployment.md](docs/deploy/vps-deployment.md)
 
 ### Image Optimization

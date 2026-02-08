@@ -49,8 +49,6 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
-RUN corepack enable
-
 WORKDIR /app
 
 # Copy production dependencies from builder

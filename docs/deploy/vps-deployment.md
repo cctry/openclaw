@@ -100,6 +100,31 @@ docker-compose ps
 curl http://localhost:18789
 ```
 
+## 运行 CLI 命令
+
+使用 `docker run` 命令临时运行 CLI：
+
+```bash
+# 运行 agent 命令
+docker run --rm -it \
+  -e OPENCLAW_GATEWAY_TOKEN=$OPENCLAW_GATEWAY_TOKEN \
+  -v openclaw_openclaw-config:/home/node/.openclaw \
+  ghcr.io/cctry/openclaw:latest agent --message "hello"
+
+# 发送消息
+docker run --rm -it \
+  -e OPENCLAW_GATEWAY_TOKEN=$OPENCLAW_GATEWAY_TOKEN \
+  -v openclaw_openclaw-config:/home/node/.openclaw \
+  ghcr.io/cctry/openclaw:latest message send --to +1234567890 --message "Test"
+
+# 查看帮助
+docker run --rm ghcr.io/cctry/openclaw:latest --help
+```
+
+**注意**: 
+- 端口默认绑定到 `127.0.0.1`（localhost），只允许本地访问。
+- 如需外部访问，请修改 `.env` 文件中的端口配置或在 `docker-compose.yml` 中移除 `127.0.0.1:` 前缀（不推荐用于生产环境）。
+
 ## 镜像更新
 
 当有新版本时，执行以下命令更新：

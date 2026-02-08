@@ -3,8 +3,14 @@
 # 
 # Usage:
 #   1. Copy this file to your VPS as docker-compose.yml
-#   2. Create a .env file with your configuration (see .env.example below)
+#   2. Create a .env file with your configuration (see .env.vps.example)
 #   3. Run: docker-compose pull && docker-compose up -d
+#
+# To run CLI commands (one-off):
+#   docker run --rm -it \
+#     -e OPENCLAW_GATEWAY_TOKEN=$OPENCLAW_GATEWAY_TOKEN \
+#     -v openclaw_openclaw-config:/home/node/.openclaw \
+#     ghcr.io/cctry/openclaw:latest agent --message "hello"
 #
 # The image is automatically built and pushed to GHCR by GitHub Actions
 # on every push to main and when tags are created.
@@ -26,8 +32,8 @@ services:
       - openclaw-config:/home/node/.openclaw
       - openclaw-workspace:/home/node/.openclaw/workspace
     ports:
-      - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
-      - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"
+      - "127.0.0.1:${OPENCLAW_GATEWAY_PORT:-18789}:18789"
+      - "127.0.0.1:${OPENCLAW_BRIDGE_PORT:-18790}:18790"
     restart: unless-stopped
     command:
       - node
@@ -37,26 +43,6 @@ services:
       - ${OPENCLAW_GATEWAY_BIND:-lan}
       - --port
       - "18789"
-
-  openclaw-cli:
-    image: ghcr.io/cctry/openclaw:latest
-    container_name: openclaw-cli
-    environment:
-      HOME: /home/node
-      TERM: xterm-256color
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
-      BROWSER: echo
-      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
-      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
-      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
-    volumes:
-      - openclaw-config:/home/node/.openclaw
-      - openclaw-workspace:/home/node/.openclaw/workspace
-    stdin_open: true
-    tty: true
-    entrypoint:
-      - node
-      - openclaw.mjs
 
 volumes:
   openclaw-config:
