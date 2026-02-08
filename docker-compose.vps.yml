@@ -1,0 +1,67 @@
+# Docker Compose configuration for VPS deployment
+# Compatible with docker-compose 1.17.1
+# 
+# Usage:
+#   1. Copy this file to your VPS as docker-compose.yml
+#   2. Create a .env file with your configuration (see .env.example below)
+#   3. Run: docker-compose pull && docker-compose up -d
+#
+# The image is automatically built and pushed to GHCR by GitHub Actions
+# on every push to main and when tags are created.
+
+version: '3.3'
+
+services:
+  openclaw-gateway:
+    image: ghcr.io/cctry/openclaw:latest
+    container_name: openclaw-gateway
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
+    volumes:
+      - openclaw-config:/home/node/.openclaw
+      - openclaw-workspace:/home/node/.openclaw/workspace
+    ports:
+      - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
+      - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"
+    init: true
+    restart: unless-stopped
+    command:
+      - node
+      - openclaw.mjs
+      - gateway
+      - --bind
+      - ${OPENCLAW_GATEWAY_BIND:-lan}
+      - --port
+      - "18789"
+
+  openclaw-cli:
+    image: ghcr.io/cctry/openclaw:latest
+    container_name: openclaw-cli
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      BROWSER: echo
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
+    volumes:
+      - openclaw-config:/home/node/.openclaw
+      - openclaw-workspace:/home/node/.openclaw/workspace
+    stdin_open: true
+    tty: true
+    init: true
+    entrypoint:
+      - node
+      - openclaw.mjs
+
+volumes:
+  openclaw-config:
+    driver: local
+  openclaw-workspace:
+    driver: local
