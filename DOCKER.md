@@ -11,8 +11,9 @@
 This repository provides optimized Docker images built via GitHub Actions and published to GitHub Container Registry (GHCR).
 
 **Image Variants**:
-- `ghcr.io/cctry/openclaw:latest` or `ghcr.io/cctry/openclaw:slim` - **Slim image** (default, ~400-500MB, no PDF extraction)
-- `ghcr.io/cctry/openclaw:full` - **Full image** (~800MB+, includes canvas for PDF image extraction)
+- `ghcr.io/cctry/openclaw:ultra` - **Ultra-minimal** (~150-250MB, distroless, gateway-only, no UI, no optional deps) **← Recommended for VPS with limited disk**
+- `ghcr.io/cctry/openclaw:latest` or `ghcr.io/cctry/openclaw:slim` - **Slim image** (default, ~300-400MB, no PDF extraction, includes UI)
+- `ghcr.io/cctry/openclaw:full` - **Full image** (~700-800MB, includes canvas for PDF image extraction)
 
 #### Prerequisites
 
@@ -20,7 +21,27 @@ This repository provides optimized Docker images built via GitHub Actions and pu
 - docker-compose 1.17.1+ (for compose deployment)
 - Platform: linux/amd64 or linux/arm64
 
+#### Pull and Run (Ultra - Gateway Only, Smallest)
+
+For VPS with limited disk space (< 2GB):
+
+```bash
+# Pull the ultra-minimal image
+docker pull ghcr.io/cctry/openclaw:ultra
+
+# Run gateway only (no UI, distroless base)
+docker run -d \
+  -e OPENCLAW_GATEWAY_TOKEN=your-secure-token \
+  -p 18789:18789 \
+  -v openclaw-config:/home/nonroot/.openclaw \
+  ghcr.io/cctry/openclaw:ultra
+```
+
+**Note**: Ultra variant uses distroless base and runs as uid 65532 (nonroot). Config directory is `/home/nonroot/.openclaw`.
+
 #### Pull and Run (Slim - Default)
+
+Balanced option with UI support:
 
 ```bash
 # Pull the latest slim image (default)
@@ -72,31 +93,57 @@ For detailed instructions, see: [docs/deploy/vps-deployment.md](docs/deploy/vps-
 
 ### Image Optimization
 
-The Docker image uses a strict multi-stage build to minimize size and includes two variants:
+The Docker image uses a strict multi-stage build and includes three variants optimized for different use cases:
+
+#### Ultra Image - `ghcr.io/cctry/openclaw:ultra` **← SMALLEST**
+
+- **Base**: `gcr.io/distroless/nodejs20-debian12:nonroot` (Google's distroless, no shell)
+- **Builder stage**: Full build tools, skip UI build
+- **Runtime stage**: Gateway-only, no UI assets, no optional dependencies
+- **Size**: ~150-250MB compressed
+- **Optimizations**:
+  - Distroless base (no package manager, no shell, minimal attack surface)
+  - Skips UI build (`pnpm ui:build` not run)
+  - `--no-optional` flag ensures canvas never installed
+  - `ENV PNPM_CONFIG_OPTIONAL=false` for defense in depth
+  - Build-time assertion: fails if canvas packages detected
+  - Runs as nonroot user (uid 65532)
+- **Use case**: **VPS with limited disk (<2GB)**, gateway-only deployments, maximum security
 
 #### Slim Image (Default) - `ghcr.io/cctry/openclaw:slim` or `:latest`
 
-- **Builder stage**: Full Node.js 20 environment with build tools
-- **Runtime stage**: Minimal `node:20-slim` base with only production dependencies
-- **Excludes**: `@napi-rs/canvas` and other optional dependencies (saves ~400MB+)
-- **Size**: ~400-500MB compressed
-- **Use case**: Core gateway/agent features without PDF image extraction
+- **Base**: `node:20-slim`
+- **Builder stage**: Full build tools, includes UI build
+- **Runtime stage**: Minimal with production dependencies only
+- **Excludes**: `@napi-rs/canvas` and all optional dependencies
+- **Size**: ~300-400MB compressed
+- **Optimizations**:
+  - `--no-optional` flag ensures canvas never installed
+  - `ENV PNPM_CONFIG_OPTIONAL=false` for defense in depth
+  - Build-time and runtime assertions: fails if canvas detected
+  - Explicit verification in both builder and runtime stages
+  - Shows component sizes during build
+- **Use case**: Standard deployments with UI, no PDF image extraction
 
 #### Full Image - `ghcr.io/cctry/openclaw:full`
 
 - Same optimized build process as slim
 - **Includes**: `@napi-rs/canvas` for PDF image extraction
-- **Size**: ~800MB+ compressed
+- **Size**: ~700-800MB compressed
 - **Use case**: When you need PDF image extraction features
 
 **Size comparison**:
 - Before optimization: ~1.5GB+ (single-stage, node:22-bookworm, includes canvas)
-- Slim image: ~400-500MB (multi-stage, node:20-slim, no canvas)
-- Full image: ~800MB (multi-stage, node:20-slim, with canvas)
+- Ultra image: ~150-250MB (distroless, no UI, no optional) **← 83-86% reduction**
+- Slim image: ~300-400MB (node:20-slim, with UI, no optional) **← 73-80% reduction**
+- Full image: ~700-800MB (node:20-slim, with UI and canvas) **← 46-53% reduction**
 
 **Key optimizations**:
-- Changed from `node:22-bookworm` to `node:20-slim`
-- Moved `@napi-rs/canvas` from peerDependencies to optionalDependencies
+- Ultra: Distroless base + skip UI build + no optional deps
+- All variants: `pnpm install --prod --no-optional` (explicit)
+- All variants: `ENV PNPM_CONFIG_OPTIONAL=false` (defense in depth)
+- Slim/Ultra: Build-time assertions to verify no canvas
+- Changed from `node:22-bookworm` to `node:20-slim` (slim/full)
 - Strict production-only dependency installation
 - Removed build cache and pnpm store in runtime
 - Cleaned up apt lists and cache
@@ -104,19 +151,23 @@ The Docker image uses a strict multi-stage build to minimize size and includes t
 ### Automatic Builds
 
 Images are automatically built and pushed to GHCR when:
-- Code is pushed to the `main` branch → `latest`, `slim`, and `full` tags
-- Version tags are created (e.g., `v2026.2.6`) → version-specific tags with `-slim` and `-full` variants
+- Code is pushed to the `main` branch → `latest`, `slim`, `ultra`, and `full` tags
+- Version tags are created (e.g., `v2026.2.6`) → version-specific tags with `-ultra`, `-slim` and `-full` variants
 
 **Available tags**:
-- `latest` / `slim` - Latest slim build from main
+- `ultra` - Latest ultra-minimal build (distroless, gateway-only)
+- `latest` / `slim` - Latest slim build from main (default)
 - `full` - Latest full build from main
+- `v{version}-ultra` - Version-tagged ultra image
 - `v{version}` / `v{version}-slim` - Version-tagged slim image
 - `v{version}-full` - Version-tagged full image
-- `{branch}-slim`, `{branch}-full` - Branch-specific builds
+- `{branch}-ultra`, `{branch}-slim`, `{branch}-full` - Branch-specific builds
+
+**Image inspection**: Workflows automatically print image sizes and layer information to help monitor optimization.
 
 Workflow files: 
-- `.github/workflows/docker-ghcr.yml` (single platform, amd64)
-- `.github/workflows/docker-release.yml` (multi-platform, amd64 + arm64)
+- `.github/workflows/docker-ghcr.yml` (single platform, amd64, with size inspection)
+- `.github/workflows/docker-release.yml` (multi-platform, amd64 + arm64, all variants)
 
 ---
 
@@ -127,8 +178,9 @@ Workflow files:
 本仓库通过 GitHub Actions 构建优化的 Docker 镜像，并发布到 GitHub Container Registry (GHCR)。
 
 **镜像变体**:
-- `ghcr.io/cctry/openclaw:latest` 或 `ghcr.io/cctry/openclaw:slim` - **精简镜像** (默认，~400-500MB，无 PDF 提取)
-- `ghcr.io/cctry/openclaw:full` - **完整镜像** (~800MB+，包含 canvas 用于 PDF 图像提取)
+- `ghcr.io/cctry/openclaw:ultra` - **超精简** (~150-250MB，distroless，仅网关，无 UI，无可选依赖) **← VPS 磁盘有限推荐**
+- `ghcr.io/cctry/openclaw:latest` 或 `ghcr.io/cctry/openclaw:slim` - **精简镜像** (默认，~300-400MB，无 PDF 提取，含 UI)
+- `ghcr.io/cctry/openclaw:full` - **完整镜像** (~700-800MB，包含 canvas 用于 PDF 图像提取)
 
 #### 系统要求
 
@@ -136,7 +188,27 @@ Workflow files:
 - docker-compose 1.17.1+ (compose 部署时需要)
 - 平台: linux/amd64 或 linux/arm64
 
+#### 拉取并运行 (超精简版 - 仅网关，最小)
+
+VPS 磁盘有限 (< 2GB) 时推荐:
+
+```bash
+# 拉取超精简镜像
+docker pull ghcr.io/cctry/openclaw:ultra
+
+# 仅运行网关（无 UI，distroless 基础）
+docker run -d \
+  -e OPENCLAW_GATEWAY_TOKEN=your-secure-token \
+  -p 18789:18789 \
+  -v openclaw-config:/home/nonroot/.openclaw \
+  ghcr.io/cctry/openclaw:ultra
+```
+
+**注意**：Ultra 变体使用 distroless 基础镜像，以 uid 65532 (nonroot) 运行。配置目录为 `/home/nonroot/.openclaw`。
+
 #### 拉取并运行 (精简版 - 默认)
+
+平衡选项，支持 UI:
 
 ```bash
 # 拉取最新精简镜像 (默认)
@@ -240,6 +312,20 @@ Docker 镜像使用多阶段构建以最小化体积:
 ## Building Locally
 
 If you want to build the images locally:
+
+### Ultra Image (smallest, gateway-only)
+
+```bash
+# Build the ultra image (distroless, no UI, no canvas)
+docker build -t openclaw:ultra -f Dockerfile.ultra .
+
+# Run it (note: nonroot user, different config path)
+docker run -d \
+  -e OPENCLAW_GATEWAY_TOKEN=your-token \
+  -p 18789:18789 \
+  -v openclaw-config:/home/nonroot/.openclaw \
+  openclaw:ultra
+```
 
 ### Slim Image (default)
 

@@ -37,21 +37,27 @@ ENV OPENCLAW_PREFER_PNPM=1
 RUN pnpm ui:build
 
 # Remove node_modules and reinstall only production dependencies
-# This ensures we don't carry dev dependencies or optional deps like canvas
+# CRITICAL: --no-optional ensures @napi-rs/canvas is NEVER installed
 RUN rm -rf node_modules
 
-# Use pnpm fetch + install offline for cleaner production deps
-RUN pnpm fetch --prod
-RUN pnpm install --offline --prod --frozen-lockfile
+# Set environment variable to disable optional dependencies (defense in depth)
+ENV PNPM_CONFIG_OPTIONAL=false
 
-# Optional: Remove @napi-rs/canvas if it was installed
-RUN rm -rf node_modules/.pnpm/*canvas* 2>/dev/null || true
+# Use pnpm fetch + install offline for cleaner production deps WITHOUT optional
+RUN pnpm fetch --prod --no-optional
+RUN pnpm install --offline --prod --no-optional --frozen-lockfile
+
+# Assert: No canvas packages should exist
+RUN echo "=== Verifying NO canvas packages in slim build ===" && \
+    ! find node_modules -type d \( -name "*canvas*" -o -name "@napi-rs" \) 2>/dev/null | grep -q . && \
+    echo "✓ Verified: No canvas packages found" || \
+    (echo "✗ ERROR: Canvas packages found in slim build!" && exit 1)
 
 # Clean up pnpm store to save space
 RUN rm -rf /root/.local/share/pnpm/store
 
 # Show final node_modules size for debugging
-RUN echo "=== Builder node_modules size ===" && \
+RUN echo "=== Builder node_modules size (SLIM - no optional) ===" && \
     du -sh node_modules && \
     echo "=== Top 10 largest packages ===" && \
     (du -sh node_modules/.pnpm/* 2>/dev/null | sort -rh | head -10 || echo "N/A")
@@ -71,6 +77,8 @@ RUN apt-get update && \
 WORKDIR /app
 
 ENV NODE_ENV=production
+# Ensure optional dependencies are never installed at runtime
+ENV PNPM_CONFIG_OPTIONAL=false
 
 # Copy production dependencies from builder (without canvas)
 COPY --from=builder /app/node_modules ./node_modules
@@ -83,9 +91,18 @@ COPY --from=builder /app/extensions ./extensions
 COPY --from=builder /app/skills ./skills
 COPY --from=builder /app/LICENSE ./LICENSE
 
-# Show runtime node_modules size
-RUN echo "=== Runtime node_modules size ===" && \
-    du -sh node_modules
+# Final verification: Assert no canvas in runtime
+RUN echo "=== Runtime verification ===" && \
+    ! find node_modules -type d \( -name "*canvas*" -o -name "@napi-rs" \) 2>/dev/null | grep -q . && \
+    echo "✓ Runtime verified: No canvas packages" || \
+    (echo "✗ ERROR: Canvas found in runtime!" && exit 1)
+
+# Show runtime sizes
+RUN echo "=== Runtime image sizes ===" && \
+    du -sh node_modules && \
+    du -sh dist && \
+    du -sh extensions && \
+    du -sh skills
 
 # Create necessary directories for runtime
 RUN mkdir -p /home/node/.openclaw /home/node/.openclaw/workspace && \

@@ -1,0 +1,95 @@
+#############################################
+# Builder Stage: Install dependencies and build
+#############################################
+FROM node:20-slim AS builder
+
+# Enable corepack for pnpm support
+RUN corepack enable
+
+WORKDIR /app
+
+# Install essential build tools
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    ca-certificates \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
+# Copy package files for dependency installation
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY ui/package.json ./ui/package.json
+COPY patches ./patches
+COPY scripts ./scripts
+
+# Install all dependencies (including devDependencies for build)
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build the application (skip UI build for ultra variant to save space)
+RUN OPENCLAW_A2UI_SKIP_MISSING=1 pnpm build
+
+# Remove node_modules and reinstall only production dependencies
+# CRITICAL: --no-optional ensures @napi-rs/canvas is NEVER installed
+RUN rm -rf node_modules
+
+# Set environment variable to disable optional dependencies (defense in depth)
+ENV PNPM_CONFIG_OPTIONAL=false
+
+# Use pnpm fetch + install offline for cleaner production deps WITHOUT optional
+RUN pnpm fetch --prod --no-optional
+RUN pnpm install --offline --prod --no-optional --frozen-lockfile
+
+# Assert: No canvas packages should exist
+RUN echo "=== Verifying NO canvas packages in ultra build ===" && \
+    ! find node_modules -type d \( -name "*canvas*" -o -name "@napi-rs" \) 2>/dev/null | grep -q . && \
+    echo "✓ Verified: No canvas packages found" || \
+    (echo "✗ ERROR: Canvas packages found in ultra build!" && exit 1)
+
+# Clean up pnpm store to save space
+RUN rm -rf /root/.local/share/pnpm/store
+
+# Show final sizes for debugging
+RUN echo "=== Builder sizes (ULTRA - gateway-only, no UI, no optional) ===" && \
+    du -sh node_modules && \
+    du -sh dist && \
+    echo "=== Top 10 largest packages ===" && \
+    (du -sh node_modules/.pnpm/* 2>/dev/null | sort -rh | head -10 || echo "N/A")
+
+#############################################
+# Runtime Stage: Ultra-minimal distroless image
+#############################################
+FROM gcr.io/distroless/nodejs20-debian12:nonroot AS runtime
+
+WORKDIR /app
+
+# Copy production dependencies from builder (without canvas)
+COPY --from=builder --chown=nonroot:nonroot /app/node_modules ./node_modules
+
+# Copy only gateway-essential runtime files (NO docs, README, UI assets)
+COPY --from=builder --chown=nonroot:nonroot /app/dist ./dist
+COPY --from=builder --chown=nonroot:nonroot /app/openclaw.mjs ./openclaw.mjs
+COPY --from=builder --chown=nonroot:nonroot /app/package.json ./package.json
+# Extensions are needed for plugins
+COPY --from=builder --chown=nonroot:nonroot /app/extensions ./extensions
+# Skills are needed for agent functionality
+COPY --from=builder --chown=nonroot:nonroot /app/skills ./skills
+
+# Note: Distroless doesn't have shell, so we can't run du commands here
+# Image size will be measured externally via docker inspect/history
+
+# Environment variables (distroless supports ENV)
+ENV NODE_ENV=production
+ENV PNPM_CONFIG_OPTIONAL=false
+
+# Distroless runs as nonroot user by default (uid 65532)
+# No USER command needed
+
+# Start gateway server with default config
+# Pure node entrypoint (no shell)
+ENTRYPOINT ["node", "openclaw.mjs"]
+CMD ["gateway", "--allow-unconfigured"]
