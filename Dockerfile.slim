@@ -72,6 +72,9 @@ RUN if [ "$OPENCLAW_PRUNE_EXTRA" = "1" ]; then \
       rm -rf node_modules/.pnpm/@slack+bolt@* 2>/dev/null || true; \
       rm -rf node_modules/.pnpm/@slack+web-api@* 2>/dev/null || true; \
       rm -rf node_modules/.pnpm/playwright-core@* 2>/dev/null || true; \
+      rm -rf node_modules/.pnpm/@napi-rs+canvas@* 2>/dev/null || true; \
+      rm -rf node_modules/.pnpm/@napi-rs+canvas-linux-* 2>/dev/null || true; \
+      rm -rf node_modules/.pnpm/pdfjs-dist@* 2>/dev/null || true; \
     fi
 
 # ============================================
