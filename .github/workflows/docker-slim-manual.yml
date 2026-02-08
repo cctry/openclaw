@@ -45,11 +45,12 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push ${{ matrix.variant }}
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile.slim
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           build-args: |
             OPENCLAW_PRUNE_EXTRA=${{ matrix.prune_extra }}
           tags: |
@@ -58,3 +59,13 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: false
           push: true
+
+      - name: Add image to workflow summary
+        run: |
+          echo "### Built Docker Image 🐳" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.docker_tag_prefix }}-${{ steps.vars.outputs.short_sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Platform:** linux/amd64" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Variant:** ${{ matrix.variant }}" >> "$GITHUB_STEP_SUMMARY"
