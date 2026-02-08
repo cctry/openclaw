@@ -14,6 +14,7 @@ env:
 jobs:
   # Build amd64 image
   build-amd64:
+    if: false  # Workflow disabled
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -63,6 +64,7 @@ jobs:
 
   # Build arm64 image
   build-arm64:
+    if: false  # Workflow disabled
     runs-on: ubuntu-24.04-arm
     permissions:
       packages: write
@@ -112,6 +114,7 @@ jobs:
 
   # Create multi-platform manifest
   create-manifest:
+    if: false  # Workflow disabled
     runs-on: ubuntu-latest
     permissions:
       packages: write
