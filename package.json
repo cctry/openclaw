@@ -181,8 +181,10 @@
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   },
+  "optionalDependencies": {
+    "@napi-rs/canvas": "^0.1.89"
+  },
   "peerDependencies": {
-    "@napi-rs/canvas": "^0.1.89",
     "node-llama-cpp": "3.15.1"
   },
   "overrides": {

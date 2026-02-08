@@ -10,6 +10,7 @@ permissions: {}
 
 jobs:
   auto-response:
+    if: false  # Temporarily disabled for image optimization work
     permissions:
       issues: write
       pull-requests: write

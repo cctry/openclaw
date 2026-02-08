@@ -37,31 +37,30 @@ ENV OPENCLAW_PREFER_PNPM=1
 RUN pnpm ui:build
 
 # Remove node_modules and reinstall only production dependencies
-# This ensures we don't carry dev dependencies or optional deps like canvas
 RUN rm -rf node_modules
 
-# Use pnpm fetch + install offline for cleaner production deps
+# Use pnpm fetch + install offline for production + optional deps (including canvas)
 RUN pnpm fetch --prod
 RUN pnpm install --offline --prod --frozen-lockfile
 
-# Optional: Remove @napi-rs/canvas if it was installed
-RUN rm -rf node_modules/.pnpm/*canvas* 2>/dev/null || true
+# Explicitly install optional canvas dependency
+RUN pnpm add @napi-rs/canvas@^0.1.89 --save-optional || echo "Canvas install failed, continuing..."
 
 # Clean up pnpm store to save space
 RUN rm -rf /root/.local/share/pnpm/store
 
 # Show final node_modules size for debugging
-RUN echo "=== Builder node_modules size ===" && \
+RUN echo "=== Builder node_modules size (with canvas) ===" && \
     du -sh node_modules && \
     echo "=== Top 10 largest packages ===" && \
     (du -sh node_modules/.pnpm/* 2>/dev/null | sort -rh | head -10 || echo "N/A")
 
 #############################################
-# Runtime Stage: Minimal production image (SLIM - no canvas)
+# Runtime Stage: Full image with canvas support
 #############################################
 FROM node:20-slim AS runtime
 
-# Install only essential runtime dependencies
+# Install runtime dependencies including those needed for canvas
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -72,7 +71,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Copy production dependencies from builder (without canvas)
+# Copy production dependencies from builder (including canvas)
 COPY --from=builder /app/node_modules ./node_modules
 
 # Copy only essential runtime files
@@ -84,7 +83,7 @@ COPY --from=builder /app/skills ./skills
 COPY --from=builder /app/LICENSE ./LICENSE
 
 # Show runtime node_modules size
-RUN echo "=== Runtime node_modules size ===" && \
+RUN echo "=== Runtime node_modules size (with canvas) ===" && \
     du -sh node_modules
 
 # Create necessary directories for runtime
@@ -92,14 +91,7 @@ RUN mkdir -p /home/node/.openclaw /home/node/.openclaw/workspace && \
     chown -R node:node /app /home/node/.openclaw
 
 # Security hardening: Run as non-root user
-# The node:20-slim image includes a 'node' user (uid 1000)
-# This reduces the attack surface by preventing container escape via root privileges
 USER node
 
-# Start gateway server with default config.
-# Binds to loopback (127.0.0.1) by default for security.
-#
-# For container platforms requiring external health checks:
-#   1. Set OPENCLAW_GATEWAY_TOKEN or OPENCLAW_GATEWAY_PASSWORD env var
-#   2. Override CMD: ["node","openclaw.mjs","gateway","--allow-unconfigured","--bind","lan"]
+# Start gateway server with default config
 CMD ["node", "openclaw.mjs", "gateway", "--allow-unconfigured"]

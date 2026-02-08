@@ -1,0 +1,127 @@
+name: Docker Dependency Analysis
+
+on:
+  workflow_dispatch:
+
+jobs:
+  analyze-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Print versions
+        run: |
+          echo "=== System Versions ==="
+          node -v
+          pnpm -v
+          echo ""
+
+      - name: Install all dependencies (including dev)
+        run: |
+          echo "=== Installing all dependencies (dev + prod) ==="
+          pnpm install --frozen-lockfile
+          echo ""
+
+      - name: Analyze @napi-rs/canvas dependency
+        run: |
+          echo "=== Who depends on @napi-rs/canvas? ==="
+          pnpm why @napi-rs/canvas || echo "Not found in dependency tree"
+          echo ""
+          
+          echo "=== Who depends on canvas? ==="
+          pnpm why canvas || echo "Not found in dependency tree"
+          echo ""
+
+      - name: List all canvas-related packages
+        run: |
+          echo "=== All packages matching 'canvas' ==="
+          pnpm list --depth 10 | grep -i canvas || echo "No canvas packages found"
+          echo ""
+
+      - name: Show node_modules size (with dev dependencies)
+        run: |
+          echo "=== node_modules size (dev + prod) ==="
+          du -sh node_modules
+          du -sh node_modules/.pnpm 2>/dev/null || echo "No .pnpm directory"
+          echo ""
+          
+          echo "=== Top 10 largest packages in node_modules ==="
+          du -sh node_modules/.pnpm/* 2>/dev/null | sort -rh | head -10 || echo "Cannot analyze .pnpm"
+          echo ""
+
+      - name: Clean and install production dependencies only
+        run: |
+          echo "=== Cleaning node_modules ==="
+          rm -rf node_modules
+          echo ""
+          
+          echo "=== Installing production dependencies only ==="
+          pnpm install --prod --frozen-lockfile
+          echo ""
+
+      - name: Show node_modules size (production only)
+        run: |
+          echo "=== node_modules size (prod only) ==="
+          du -sh node_modules
+          du -sh node_modules/.pnpm 2>/dev/null || echo "No .pnpm directory"
+          echo ""
+          
+          echo "=== Top 10 largest packages in node_modules (prod only) ==="
+          du -sh node_modules/.pnpm/* 2>/dev/null | sort -rh | head -10 || echo "Cannot analyze .pnpm"
+          echo ""
+
+      - name: Check if @napi-rs/canvas is in production dependencies
+        run: |
+          echo "=== Checking @napi-rs/canvas in production node_modules ==="
+          if [ -d "node_modules/.pnpm" ]; then
+            find node_modules/.pnpm -type d -name "*@napi-rs*canvas*" | head -5 || echo "Not found"
+          else
+            find node_modules -type d -name "*@napi-rs*" | grep -i canvas | head -5 || echo "Not found"
+          fi
+          echo ""
+
+      - name: Analyze package.json dependencies
+        run: |
+          echo "=== package.json Analysis ==="
+          echo ""
+          echo "dependencies containing 'canvas':"
+          cat package.json | jq '.dependencies | to_entries | .[] | select(.key | contains("canvas"))' || echo "None"
+          echo ""
+          echo "devDependencies containing 'canvas':"
+          cat package.json | jq '.devDependencies | to_entries | .[] | select(.key | contains("canvas"))' || echo "None"
+          echo ""
+          echo "peerDependencies containing 'canvas':"
+          cat package.json | jq '.peerDependencies | to_entries | .[] | select(.key | contains("canvas"))' || echo "None"
+          echo ""
+          echo "optionalDependencies containing 'canvas':"
+          cat package.json | jq '.optionalDependencies | to_entries | .[] | select(.key | contains("canvas"))' || echo "None"
+          echo ""
+
+      - name: Summary and Recommendations
+        run: |
+          echo ""
+          echo "╔════════════════════════════════════════════════════════════════╗"
+          echo "║                    ANALYSIS SUMMARY                            ║"
+          echo "╚════════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "This analysis shows:"
+          echo "1. The size difference between dev+prod vs prod-only node_modules"
+          echo "2. Whether @napi-rs/canvas is pulled into production dependencies"
+          echo "3. The largest packages contributing to image size"
+          echo ""
+          echo "RECOMMENDATIONS:"
+          echo "- If canvas is in peerDependencies, it may still be installed"
+          echo "- Move canvas to optionalDependencies to make it truly optional"
+          echo "- Use conditional imports (already done in src/media/input-files.ts)"
+          echo "- Build separate Docker images: slim (no canvas) and full (with canvas)"
+          echo ""

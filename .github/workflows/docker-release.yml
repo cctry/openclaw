@@ -12,8 +12,8 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Build amd64 image
-  build-amd64:
+  # Build slim amd64 image (default, no canvas)
+  build-slim-amd64:
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -35,7 +35,7 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
+      - name: Extract metadata for slim
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -43,26 +43,25 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
-            type=semver,pattern={{version}},suffix=-amd64
-            type=semver,pattern={{version}},suffix=-arm64
-            type=ref,event=branch,suffix=-amd64
-            type=ref,event=branch,suffix=-arm64
+            type=semver,pattern={{version}},suffix=-slim-amd64
+            type=ref,event=branch,suffix=-slim-amd64
 
-      - name: Build and push amd64 image
+      - name: Build and push slim amd64 image
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./Dockerfile
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=slim-amd64
+          cache-to: type=gha,mode=max,scope=slim-amd64
           provenance: false
           push: true
 
-  # Build arm64 image
-  build-arm64:
+  # Build slim arm64 image (default, no canvas)
+  build-slim-arm64:
     runs-on: ubuntu-24.04-arm
     permissions:
       packages: write
@@ -84,7 +83,7 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
+      - name: Extract metadata for slim
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -92,31 +91,122 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
-            type=semver,pattern={{version}},suffix=-amd64
-            type=semver,pattern={{version}},suffix=-arm64
-            type=ref,event=branch,suffix=-amd64
-            type=ref,event=branch,suffix=-arm64
+            type=semver,pattern={{version}},suffix=-slim-arm64
+            type=ref,event=branch,suffix=-slim-arm64
 
-      - name: Build and push arm64 image
+      - name: Build and push slim arm64 image
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./Dockerfile
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=slim-arm64
+          cache-to: type=gha,mode=max,scope=slim-arm64
           provenance: false
           push: true
 
-  # Create multi-platform manifest
-  create-manifest:
+  # Build full amd64 image (with canvas)
+  build-full-amd64:
     runs-on: ubuntu-latest
     permissions:
       packages: write
       contents: read
-    needs: [build-amd64, build-arm64]
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-metadata: ${{ steps.meta.outputs.json }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for full
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}},suffix=-full-amd64
+            type=ref,event=branch,suffix=-full-amd64
+
+      - name: Build and push full amd64 image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.full
+          platforms: linux/amd64
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=full-amd64
+          cache-to: type=gha,mode=max,scope=full-amd64
+          provenance: false
+          push: true
+
+  # Build full arm64 image (with canvas)
+  build-full-arm64:
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      packages: write
+      contents: read
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-metadata: ${{ steps.meta.outputs.json }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for full
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}},suffix=-full-arm64
+            type=ref,event=branch,suffix=-full-arm64
+
+      - name: Build and push full arm64 image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.full
+          platforms: linux/arm64
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=full-arm64
+          cache-to: type=gha,mode=max,scope=full-arm64
+          provenance: false
+          push: true
+
+  # Create multi-platform manifest for slim (default)
+  create-slim-manifest:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    needs: [build-slim-amd64, build-slim-arm64]
     steps:
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -125,19 +215,56 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata for manifest
+      - name: Extract metadata for slim manifest
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
+            type=ref,event=branch,suffix=-slim
             type=semver,pattern={{version}}
+            type=semver,pattern={{version}},suffix=-slim
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=slim,enable={{is_default_branch}}
 
-      - name: Create and push manifest
+      - name: Create and push slim manifest
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            ${{ needs.build-amd64.outputs.image-digest }} \
-            ${{ needs.build-arm64.outputs.image-digest }}
+            ${{ needs.build-slim-amd64.outputs.image-digest }} \
+            ${{ needs.build-slim-arm64.outputs.image-digest }}
+        env:
+          DOCKER_METADATA_OUTPUT_JSON: ${{ steps.meta.outputs.json }}
+
+  # Create multi-platform manifest for full
+  create-full-manifest:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    needs: [build-full-amd64, build-full-arm64]
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for full manifest
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch,suffix=-full
+            type=semver,pattern={{version}},suffix=-full
+            type=raw,value=full,enable={{is_default_branch}}
+
+      - name: Create and push full manifest
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            ${{ needs.build-full-amd64.outputs.image-digest }} \
+            ${{ needs.build-full-arm64.outputs.image-digest }}
         env:
           DOCKER_METADATA_OUTPUT_JSON: ${{ steps.meta.outputs.json }}
