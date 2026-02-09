@@ -60,7 +60,6 @@ RUN rm -rf node_modules/.pnpm/@node-llama-cpp* 2>/dev/null || true && \
     rm -rf node_modules/.pnpm/*tensorflow* 2>/dev/null || true && \
     rm -rf node_modules/.pnpm/*linux-x64-musl* 2>/dev/null || true && \
     rm -rf node_modules/.pnpm/*linuxmusl* 2>/dev/null || true && \
-    rm -rf node_modules/.pnpm/typescript@* 2>/dev/null || true && \
     find node_modules -type f -name "*.map" -delete && \
     find node_modules -type d \( -name "__tests__" -o -name "test" -o -name "tests" -o -name "docs" -o -name "examples" -o -name "benchmark" \) -prune -exec rm -rf '{}' +
 
@@ -102,9 +101,15 @@ COPY --from=builder --chown=1000:1000 /app/dist ./dist
 # Copy runtime files
 COPY --chown=1000:1000 openclaw.mjs ./
 COPY --chown=1000:1000 package.json ./
-COPY --chown=1000:1000 extensions ./extensions
+COPY --chown=1000:1000 pnpm-workspace.yaml ./
+COPY --from=builder --chown=1000:1000 /app/extensions ./extensions
+COPY --chown=1000:1000 skills ./skills
+COPY --chown=1000:1000 docs ./docs
 
 ENV NODE_ENV=production
+
+# Create a symlink so 'openclaw' command works (openclaw.mjs has #!/usr/bin/env node shebang)
+RUN chmod +x /app/openclaw.mjs && ln -s /app/openclaw.mjs /usr/local/bin/openclaw
 
 # Security: run as non-root
 USER node
