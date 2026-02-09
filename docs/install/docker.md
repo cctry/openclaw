@@ -10,6 +10,10 @@ title: "Docker"
 
 Docker is **optional**. Use it only if you want a containerized gateway or to validate the Docker flow.
 
+<Note>
+  **Testing slim Docker images?** See the [Docker Slim Image Testing](/install/docker-slim-testing) guide for testing the optimized `Dockerfile.slim` builds (<500MB target).
+</Note>
+
 ## Is Docker right for me?
 
 - **Yes**: you want an isolated, throwaway gateway environment or to run OpenClaw on a host without local installs.
