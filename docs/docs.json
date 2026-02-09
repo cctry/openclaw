@@ -1247,7 +1247,7 @@
               },
               {
                 "group": "Environment and debugging",
-                "pages": ["help/environment", "help/debugging", "help/testing", "help/scripts"]
+                "pages": ["help/environment", "help/debugging", "help/testing", "help/testing-docker-slim", "help/scripts"]
               },
               {
                 "group": "Node runtime",

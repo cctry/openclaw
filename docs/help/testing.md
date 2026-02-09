@@ -327,6 +327,8 @@ Useful env vars:
 - `OPENCLAW_LIVE_GATEWAY_MODELS=...` / `OPENCLAW_LIVE_MODELS=...` to narrow the run
 - `OPENCLAW_LIVE_REQUIRE_PROFILE_KEYS=1` to ensure creds come from the profile store (not env)
 
+For testing optimized Docker images (Dockerfile.slim), see [Testing Docker Slim Images](/help/testing-docker-slim).
+
 ## Docs sanity
 
 Run docs checks after doc edits: `pnpm docs:list`.
